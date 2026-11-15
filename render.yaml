@@ -1,0 +1,41 @@
+# Render Blueprint — deploys both web apps as free static sites.
+# Dashboard → New + → Blueprint → connect this repo → Apply.
+# The Supabase URL and publishable (anon) key below are public client values by design;
+# all secrets stay in Supabase Edge Function secrets.
+
+services:
+  # User-facing app (Expo web export)
+  - type: web
+    name: nakshtra-app
+    runtime: static
+    buildCommand: npm install && cd apps/mobile && npx expo export --platform web
+    staticPublishPath: apps/mobile/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: EXPO_PUBLIC_SUPABASE_URL
+        value: https://vpmecsknxewdkjzwszem.supabase.co
+      - key: EXPO_PUBLIC_SUPABASE_ANON_KEY
+        value: sb_publishable_Jhe-1MwTYFFVIhwHYhbdqw_aNTBsMnS
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # Admin panel (Vite build)
+  - type: web
+    name: nakshtra-admin
+    runtime: static
+    buildCommand: npm install && npm run build --workspace apps/admin
+    staticPublishPath: apps/admin/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_SUPABASE_URL
+        value: https://vpmecsknxewdkjzwszem.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: sb_publishable_Jhe-1MwTYFFVIhwHYhbdqw_aNTBsMnS
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

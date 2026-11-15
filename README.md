@@ -136,6 +136,9 @@ supabase/
 
 ## Deployment
 
-- **User app (web)**: `cd apps/mobile && npx expo export --platform web` → deploy `dist/` to any static host.
+- **Render (web, one click)**: this repo ships a [render.yaml](./render.yaml) Blueprint that deploys
+  both the user app (`nakshtra-app`) and the admin panel (`nakshtra-admin`) as free static sites.
+  Push the repo to GitHub, then in Render: **New + → Blueprint → select the repo → Apply**.
+- **User app (web, manual)**: `cd apps/mobile && npx expo export --platform web` → deploy `dist/` to any static host.
 - **User app (stores)**: use [EAS Build](https://docs.expo.dev/build/introduction/) (`npx eas build`).
-- **Admin panel**: `npm run admin:build` → deploy `apps/admin/dist/` (restrict access, e.g. behind SSO/VPN, for defence in depth).
+- **Admin panel (manual)**: `npm run admin:build` → deploy `apps/admin/dist/` (restrict access, e.g. behind SSO/VPN, for defence in depth).
