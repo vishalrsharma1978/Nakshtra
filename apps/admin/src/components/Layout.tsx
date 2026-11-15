@@ -17,7 +17,7 @@ export default function Layout() {
   return (
     <div className="layout">
       <aside className="sidebar">
-        <h1 className="brand">✨ Nakshtra Admin</h1>
+        <h1 className="brand"><img src="/logo.png" alt="Nakshtra" className="brand-logo" /> Nakshtra Admin</h1>
         <nav>
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'active' : '')}>

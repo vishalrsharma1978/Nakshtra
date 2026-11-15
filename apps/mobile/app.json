@@ -24,11 +24,19 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.nakshtra.mobile",
-      "permissions": ["CAMERA", "RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"]
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
-    }
+    },
+    "plugins": [
+      "expo-sharing",
+      "expo-asset"
+    ]
   }
 }

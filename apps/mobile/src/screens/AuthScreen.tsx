@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Pressable } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Pressable } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Button, Input, Screen } from '../components/ui';
@@ -48,7 +48,8 @@ export default function AuthScreen() {
     <Screen style={styles.wrap}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={styles.logo}>✨ {t('appName')}</Text>
+          <Image source={require('../../assets/branding/logo-small.png')} style={styles.logoImage} />
+          <Text style={styles.logo}>{t('appName')}</Text>
           <Text style={styles.tagline}>Astrology · Remedies · Expert Guidance</Text>
 
           {mode === 'signup' && (
@@ -85,6 +86,16 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   wrap: { justifyContent: 'center' },
   scroll: { flexGrow: 1, justifyContent: 'center', maxWidth: 440, width: '100%', alignSelf: 'center' },
+  logoImage: {
+    width: 110,
+    height: 110,
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
+    borderRadius: 55,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    backgroundColor: '#fff',
+  },
   logo: { fontSize: 36, fontWeight: '700', color: colors.primary, textAlign: 'center' },
   tagline: { textAlign: 'center', color: colors.textMuted, marginBottom: spacing.xl, marginTop: spacing.xs },
   switchText: { color: colors.primary, textAlign: 'center', marginTop: spacing.lg, fontWeight: '500' },

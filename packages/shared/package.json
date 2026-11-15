@@ -6,9 +6,12 @@
   "types": "src/index.ts",
   "sideEffects": false,
   "scripts": {
-    "test": "tsx --test tests/zodiac.test.ts tests/sla.test.ts"
+    "test": "tsx --test tests/zodiac.test.ts tests/sla.test.ts tests/kundli.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.0"
+  },
+  "dependencies": {
+    "astronomy-engine": "^2.1.19"
   }
 }

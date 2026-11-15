@@ -1,14 +1,14 @@
 :root {
-  --primary: #5b2a86;
-  --primary-dark: #3e1c5c;
-  --accent: #f6a821;
-  --bg: #faf7ff;
-  --card: #ffffff;
-  --text: #241b35;
-  --muted: #6f6680;
-  --border: #e5ddf2;
-  --danger: #d64545;
-  --success: #2e9e5b;
+  --primary: #7a1f1f;
+  --primary-dark: #531010;
+  --accent: #b8860b;
+  --bg: #faf6ea;
+  --card: #fffdf4;
+  --text: #3a2410;
+  --muted: #8a7354;
+  --border: #e3d5b8;
+  --danger: #c0392b;
+  --success: #2e7d4f;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   color: var(--text);
 }
@@ -31,7 +31,12 @@ a { color: var(--primary); }
   top: 0;
   height: 100vh;
 }
-.brand { font-size: 18px; padding: 0 16px 16px; margin: 0; border-bottom: 1px solid rgba(255,255,255,0.15); }
+.brand { font-size: 18px; padding: 0 16px 16px; margin: 0; border-bottom: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; gap: 8px; }
+.brand-logo { width: 34px; height: 34px; object-fit: contain; background: #fff; border-radius: 50%; padding: 2px; }
+.login-logo {
+  width: 96px; height: 96px; object-fit: cover; align-self: center;
+  border-radius: 50%; border: 3px solid var(--accent); background: #fff;
+}
 .sidebar nav { flex: 1; display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; }
 .sidebar nav a {
   color: #e6dcf5;

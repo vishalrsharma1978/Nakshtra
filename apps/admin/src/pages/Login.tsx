@@ -26,7 +26,8 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={submit}>
-        <h1>✨ Nakshtra Admin</h1>
+        <img src="/logo.png" alt="Nakshtra" className="login-logo" />
+        <h1>Nakshtra Admin</h1>
         {notAdmin ? (
           <>
             <p className="error">This account is not an admin. Ask an existing admin to grant access, or promote via SQL:</p>

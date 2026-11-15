@@ -1,101 +1,295 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { getSunSign, type ZodiacSign } from '@nakshtra/shared';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { computeKundli, formatDegree, type Kundli } from '@nakshtra/shared';
 import { useAuth } from '../context/AuthContext';
-import { Button, Card, Input } from '../components/ui';
+import { supabase } from '../lib/supabase';
+import { searchPlaces, timezoneOffsetMinutes, type GeoPlace } from '../lib/geocode';
+import { loadBrandAssets } from '../lib/brandAssets';
+import { buildKundliHtml, type KundliPerson } from '../lib/kundliReport';
+import { Button, Card, Input, Loading } from '../components/ui';
 import { colors, spacing } from '../theme';
 
-const SIGN_TRAITS: Record<string, { en: string; hi: string }> = {
-  aries: {
-    en: 'Bold, energetic and a natural leader. Mars rules your drive — channel it into focused action.',
-    hi: 'साहसी, ऊर्जावान और स्वाभाविक नेता। मंगल आपकी ऊर्जा का स्वामी है — इसे केंद्रित कार्य में लगाएं।',
-  },
-  taurus: {
-    en: 'Grounded, patient and loyal. Venus blesses you with appreciation for beauty and stability.',
-    hi: 'स्थिर, धैर्यवान और वफादार। शुक्र आपको सुंदरता और स्थिरता की सराहना का आशीर्वाद देता है।',
-  },
-  gemini: {
-    en: 'Curious, adaptable and communicative. Mercury sharpens your wit and versatility.',
-    hi: 'जिज्ञासु, अनुकूलनीय और संवादप्रिय। बुध आपकी बुद्धि और बहुमुखी प्रतिभा को तेज करता है।',
-  },
-  cancer: {
-    en: 'Nurturing, intuitive and protective. The Moon deepens your emotional intelligence.',
-    hi: 'पालन-पोषण करने वाले, सहज और रक्षक। चंद्रमा आपकी भावनात्मक बुद्धिमत्ता को गहरा करता है।',
-  },
-  leo: {
-    en: 'Confident, generous and charismatic. The Sun fuels your creative self-expression.',
-    hi: 'आत्मविश्वासी, उदार और करिश्माई। सूर्य आपकी रचनात्मक आत्म-अभिव्यक्ति को ऊर्जा देता है।',
-  },
-  virgo: {
-    en: 'Analytical, practical and service-oriented. Mercury grants precision and discernment.',
-    hi: 'विश्लेषणात्मक, व्यावहारिक और सेवा-उन्मुख। बुध सटीकता और विवेक प्रदान करता है।',
-  },
-  libra: {
-    en: 'Diplomatic, fair and harmony-seeking. Venus guides your refined aesthetic sense.',
-    hi: 'कूटनीतिक, न्यायप्रिय और सामंजस्य चाहने वाले। शुक्र आपकी परिष्कृत सौंदर्य दृष्टि का मार्गदर्शन करता है।',
-  },
-  scorpio: {
-    en: 'Intense, transformative and perceptive. Mars and Ketu energies give you depth and resilience.',
-    hi: 'तीव्र, परिवर्तनकारी और अंतर्दृष्टिपूर्ण। मंगल और केतु की ऊर्जा आपको गहराई और दृढ़ता देती है।',
-  },
-  sagittarius: {
-    en: 'Optimistic, philosophical and adventurous. Jupiter expands your horizons and wisdom.',
-    hi: 'आशावादी, दार्शनिक और साहसी। बृहस्पति आपके क्षितिज और ज्ञान का विस्तार करता है।',
-  },
-  capricorn: {
-    en: 'Disciplined, ambitious and responsible. Saturn rewards your persistent efforts.',
-    hi: 'अनुशासित, महत्वाकांक्षी और जिम्मेदार। शनि आपके निरंतर प्रयासों का फल देता है।',
-  },
-  aquarius: {
-    en: 'Innovative, humanitarian and independent. Saturn and Rahu give you visionary thinking.',
-    hi: 'नवोन्मेषी, मानवतावादी और स्वतंत्र। शनि और राहु आपको दूरदर्शी सोच देते हैं।',
-  },
-  pisces: {
-    en: 'Compassionate, artistic and spiritual. Jupiter deepens your intuition and empathy.',
-    hi: 'दयालु, कलात्मक और आध्यात्मिक। बृहस्पति आपकी अंतर्ज्ञान और सहानुभूति को गहरा करता है।',
-  },
-};
+function notify(message: string) {
+  if (Platform.OS === 'web') window.alert(message);
+  else Alert.alert('Nakshtra', message);
+}
+
+type Gender = 'male' | 'female';
 
 export default function KundliScreen() {
-  const { profile, t, lang } = useAuth();
-  const [dob, setDob] = useState(profile?.dob ?? '');
-  const [result, setResult] = useState<ZodiacSign | null>(profile?.dob ? getSunSign(profile.dob) : null);
+  const { session, profile } = useAuth();
+  const [name, setName] = useState(profile?.full_name ?? '');
+  const [gender, setGender] = useState<Gender>('male');
+  const [date, setDate] = useState(profile?.dob ?? '');
+  const [time, setTime] = useState(profile?.birth_time?.slice(0, 5) ?? '');
+  const [placeQuery, setPlaceQuery] = useState(profile?.birth_place ?? '');
+  const [placeResults, setPlaceResults] = useState<GeoPlace[]>([]);
+  const [place, setPlace] = useState<GeoPlace | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ kundli: Kundli; person: KundliPerson } | null>(null);
 
-  const compute = () => setResult(getSunSign(dob));
+  const lookupPlace = async () => {
+    setSearching(true);
+    setPlace(null);
+    try {
+      const results = await searchPlaces(placeQuery);
+      setPlaceResults(results);
+      if (results.length === 0) notify('No matching place found. Try a nearby bigger city.');
+    } catch {
+      notify('Place lookup failed. Check your internet connection.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const validate = (): string | null => {
+    if (name.trim().length < 2) return 'Please enter the full name.';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) {
+      return 'Date of birth must be YYYY-MM-DD.';
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return 'Time of birth must be HH:MM (24h).';
+    if (!place) return 'Please search and select the place of birth.';
+    return null;
+  };
+
+  const generate = async () => {
+    const err = validate();
+    if (err) {
+      notify(err);
+      return;
+    }
+    setBusy(true);
+    try {
+      const selected = place!;
+      const birthLocal = new Date(`${date}T${time}:00`);
+      const offset = timezoneOffsetMinutes(selected.timezone, birthLocal);
+      const person: KundliPerson = {
+        name: name.trim(),
+        gender,
+        date,
+        time,
+        place: `${selected.name}${selected.admin1 ? ', ' + selected.admin1 : ''}, ${selected.country}`,
+        latitude: selected.latitude,
+        longitude: selected.longitude,
+        utcOffsetMinutes: offset,
+      };
+      const kundli = computeKundli({
+        date,
+        time,
+        utcOffsetMinutes: offset,
+        latitude: selected.latitude,
+        longitude: selected.longitude,
+      });
+      setResult({ kundli, person });
+      if (session) {
+        void supabase.from('activity_log').insert({
+          user_id: session.user.id,
+          action: 'kundli_generated',
+          metadata: { place: person.place, gender },
+        });
+      }
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Kundli computation failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadPdf = async () => {
+    if (!result) return;
+    // Open the window synchronously within the click gesture so browsers don't block it
+    const win = Platform.OS === 'web' ? window.open('', '_blank') : null;
+    if (Platform.OS === 'web' && !win) {
+      notify('Please allow pop-ups to download the kundli PDF.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const brand = await loadBrandAssets();
+      const html = buildKundliHtml(result.person, result.kundli, brand);
+      if (Platform.OS === 'web') {
+        win!.document.write(html);
+        win!.document.close();
+        setTimeout(() => win!.print(), 800); // user picks "Save as PDF"
+      } else {
+        const Print = await import('expo-print');
+        const Sharing = await import('expo-sharing');
+        const { uri } = await Print.printToFileAsync({ html, base64: false });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Save your Royal Kundli PDF',
+            UTI: 'com.adobe.pdf',
+          });
+        } else {
+          notify(`Kundli PDF saved: ${uri}`);
+        }
+      }
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'PDF generation failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const k = result?.kundli;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Card>
-        <Text style={styles.sectionTitle}>{t('birthDetails')}</Text>
-        <Input label={t('dob')} value={dob} onChangeText={setDob} placeholder="1990-05-15" />
-        <Button title={t('kundli')} onPress={compute} />
+        <Text style={styles.sectionTitle}>👑 Royal Janma Kundli</Text>
+        <Text style={styles.hint}>
+          Fill the birth details below. Your kundli is computed with astronomical precision (Lahiri
+          ayanamsa) and styled as a royal {gender === 'male' ? 'Maharaja' : 'Maharani'} edition PDF.
+        </Text>
+
+        <Input label="Full Name" value={name} onChangeText={setName} autoCapitalize="words" />
+
+        <Text style={styles.label}>Kundli Style (by gender)</Text>
+        <View style={styles.genderRow}>
+          <Pressable
+            style={[styles.genderCard, gender === 'male' && styles.genderCardActiveKing]}
+            onPress={() => setGender('male')}
+          >
+            <Text style={styles.genderEmoji}>👑</Text>
+            <Text style={styles.genderTitle}>Male</Text>
+            <Text style={styles.genderSub}>Maharaja Edition</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.genderCard, gender === 'female' && styles.genderCardActiveQueen]}
+            onPress={() => setGender('female')}
+          >
+            <Text style={styles.genderEmoji}>👸</Text>
+            <Text style={styles.genderTitle}>Female</Text>
+            <Text style={styles.genderSub}>Maharani Edition</Text>
+          </Pressable>
+        </View>
+
+        <Input label="Date of Birth (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder="1990-05-15" />
+        <Input label="Time of Birth (HH:MM, 24h)" value={time} onChangeText={setTime} placeholder="14:30" />
+
+        <Text style={styles.label}>Place of Birth</Text>
+        <View style={styles.placeRow}>
+          <View style={{ flex: 1 }}>
+            <Input value={placeQuery} onChangeText={setPlaceQuery} placeholder="City name, e.g. Jaipur" />
+          </View>
+          <Button title="Search" onPress={lookupPlace} loading={searching} style={styles.searchBtn} />
+        </View>
+        {placeResults.map((p) => (
+          <Pressable
+            key={`${p.latitude}-${p.longitude}`}
+            style={[styles.placeOption, place === p && styles.placeOptionActive]}
+            onPress={() => {
+              setPlace(p);
+              setPlaceResults([p]);
+            }}
+          >
+            <Text style={styles.placeText}>
+              📍 {p.name}
+              {p.admin1 ? `, ${p.admin1}` : ''} — {p.country} ({p.timezone})
+            </Text>
+          </Pressable>
+        ))}
+
+        <Button
+          title="✨ Generate Kundli"
+          onPress={generate}
+          loading={busy && !result}
+          style={{ marginTop: spacing.md }}
+        />
       </Card>
 
-      {result && (
-        <Card style={styles.resultCard}>
-          <Text style={styles.symbol}>{result.symbol}</Text>
-          <Text style={styles.signName}>{lang === 'hi' ? result.hi : result.en}</Text>
-          <Text style={styles.element}>{result.element}</Text>
-          <Text style={styles.traits}>{SIGN_TRAITS[result.key]?.[lang] ?? ''}</Text>
-          <Text style={styles.disclaimer}>
-            {lang === 'hi'
-              ? 'विस्तृत कुंडली विश्लेषण के लिए हमारे विशेषज्ञों से परामर्श बुक करें।'
-              : 'For a detailed birth chart analysis, book a consultation with our experts.'}
+      {k && (
+        <>
+          <Card style={styles.resultCard}>
+            <Text style={styles.resultCrown}>{gender === 'male' ? '👑' : '👸'}</Text>
+            <Text style={styles.resultName}>{result!.person.name}</Text>
+            <Text style={styles.resultRow}>
+              Lagna: <Text style={styles.strong}>{k.lagna.sign} {formatDegree(k.lagna.degreeInSign)}</Text>
+            </Text>
+            <Text style={styles.resultRow}>
+              Rashi (Moon): <Text style={styles.strong}>{k.moonSign}</Text> · Nakshatra:{' '}
+              <Text style={styles.strong}>{k.moonNakshatra.en} – {k.moonPada}</Text>
+            </Text>
+            <Text style={styles.resultRow}>
+              Tithi: <Text style={styles.strong}>{k.panchang.paksha} {k.panchang.tithi}</Text> · Yoga:{' '}
+              <Text style={styles.strong}>{k.panchang.yoga}</Text>
+            </Text>
+            <Text style={styles.resultRow}>
+              Gana: <Text style={styles.strong}>{k.avakahada.gana}</Text> · Nadi:{' '}
+              <Text style={styles.strong}>{k.avakahada.nadi}</Text> · Yoni:{' '}
+              <Text style={styles.strong}>{k.avakahada.yoni}</Text>
+            </Text>
+            <Text style={styles.resultRow}>
+              Mahadasha at birth: <Text style={styles.strong}>{k.currentDashaAtBirth}</Text>
+            </Text>
+            <Text style={[styles.resultRow, { color: k.manglik ? colors.danger : colors.success }]}>
+              {k.manglik ? '⚠️ Manglik' : '✓ Non-Manglik'}
+            </Text>
+          </Card>
+
+          <Button
+            title="📜 Download Royal Kundli PDF"
+            onPress={downloadPdf}
+            loading={busy}
+          />
+          <Text style={styles.pdfHint}>
+            3-page {gender === 'male' ? 'Maharaja' : 'Maharani'} edition with Lagna & Navamsa charts,
+            planetary table, avakahada, panchang and vimshottari dasha — branded on every page.
           </Text>
-        </Card>
+        </>
       )}
+      {busy && !k && <Loading />}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.md, maxWidth: 700, width: '100%', alignSelf: 'center' },
-  sectionTitle: { fontSize: 17, fontWeight: '600', color: colors.text, marginBottom: spacing.md },
+  content: { padding: spacing.md, paddingBottom: spacing.xl, maxWidth: 700, width: '100%', alignSelf: 'center' },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
+  hint: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: spacing.md },
+  label: { color: colors.textMuted, marginBottom: spacing.sm, fontSize: 13, fontWeight: '500' },
+  genderRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
+  genderCard: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 12,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    backgroundColor: colors.card,
+  },
+  genderCardActiveKing: { borderColor: '#7a1f1f', backgroundColor: '#fdf3df' },
+  genderCardActiveQueen: { borderColor: '#a81d5b', backgroundColor: '#fdeef5' },
+  genderEmoji: { fontSize: 30 },
+  genderTitle: { fontWeight: '700', color: colors.text, marginTop: 4 },
+  genderSub: { fontSize: 11, color: colors.textMuted },
+  placeRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
+  searchBtn: { paddingVertical: 12, paddingHorizontal: spacing.md },
+  placeOption: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.card,
+  },
+  placeOptionActive: { borderColor: colors.primary, backgroundColor: colors.chipBg },
+  placeText: { color: colors.text, fontSize: 13 },
   resultCard: { alignItems: 'center' },
-  symbol: { fontSize: 64 },
-  signName: { fontSize: 24, fontWeight: '700', color: colors.primary, marginTop: spacing.sm },
-  element: { color: colors.accent, fontWeight: '600', marginTop: 4 },
-  traits: { color: colors.text, textAlign: 'center', marginTop: spacing.md, lineHeight: 22 },
-  disclaimer: { color: colors.textMuted, textAlign: 'center', marginTop: spacing.md, fontSize: 13, fontStyle: 'italic' },
+  resultCrown: { fontSize: 40 },
+  resultName: { fontSize: 20, fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
+  resultRow: { color: colors.text, marginTop: 4, fontSize: 14, textAlign: 'center' },
+  strong: { fontWeight: '700', color: colors.primaryDark },
+  pdfHint: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: spacing.sm, lineHeight: 17 },
 });

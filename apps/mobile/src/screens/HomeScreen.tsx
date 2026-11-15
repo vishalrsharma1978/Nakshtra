@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Image, RefreshControl, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getSunSign, getSignByKey, type Horoscope } from '@nakshtra/shared';
@@ -67,9 +67,12 @@ export default function HomeScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      <Text style={styles.greeting}>
-        🙏 {profile?.full_name ? profile.full_name.split(' ')[0] : t('appName')}
-      </Text>
+      <View style={styles.brandRow}>
+        <Image source={require('../../assets/branding/logo-small.png')} style={styles.brandLogo} />
+        <Text style={styles.greeting}>
+          🙏 {profile?.full_name ? profile.full_name.split(' ')[0] : t('appName')}
+        </Text>
+      </View>
 
       <Card>
         <Text style={styles.sectionTitle}>{t('dailyHoroscope')}</Text>
@@ -111,7 +114,9 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, maxWidth: 700, width: '100%', alignSelf: 'center' },
-  greeting: { fontSize: 24, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  brandLogo: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: colors.accent, backgroundColor: '#fff' },
+  greeting: { fontSize: 24, fontWeight: '700', color: colors.text },
   sectionTitle: { fontSize: 17, fontWeight: '600', color: colors.text, marginBottom: spacing.sm },
   signRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm },
   signSymbol: { fontSize: 40 },
