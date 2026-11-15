@@ -1,13 +1,16 @@
 import { useState, type FormEvent } from 'react';
+import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAdminAuth } from '../auth';
 
 export default function Login() {
-  const { session, profile, loading } = useAdminAuth();
+  const { session, profile, loading, isAdmin } = useAdminAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  if (!loading && session && isAdmin) return <Navigate to="/" replace />;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
