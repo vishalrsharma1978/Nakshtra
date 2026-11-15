@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+
+# expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# builds
+build/
+apps/admin/dist/
+
+# env - never commit secrets
+.env
+.env.*
+!.env.example
+
+# logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# supabase local
+supabase/.temp/
+supabase/.branches/

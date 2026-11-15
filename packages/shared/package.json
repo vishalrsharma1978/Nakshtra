@@ -1,0 +1,14 @@
+{
+  "name": "@nakshtra/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": false,
+  "scripts": {
+    "test": "tsx --test tests/zodiac.test.ts tests/sla.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
+  }
+}
