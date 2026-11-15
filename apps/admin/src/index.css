@@ -174,3 +174,33 @@ label.checkbox { flex-direction: row; align-items: center; gap: 8px; color: var(
 .muted { color: var(--muted); font-size: 13px; }
 .center-page { text-align: center; margin-top: 40vh; }
 .code-block { display: block; background: #f6f2fc; padding: 10px; border-radius: 8px; font-size: 12px; }
+
+/* ===== Mobile / small screens ===== */
+@media (max-width: 768px) {
+  .layout { flex-direction: column; }
+  .sidebar {
+    width: 100%; height: auto; position: static; padding: 10px 0;
+  }
+  .brand { font-size: 16px; padding: 0 12px 10px; }
+  .brand-logo { width: 28px; height: 28px; }
+  .sidebar nav {
+    flex-direction: row; overflow-x: auto; padding: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sidebar nav a { white-space: nowrap; padding: 8px 10px; font-size: 13px; }
+  .sidebar-footer {
+    flex-direction: row; align-items: center; justify-content: space-between;
+    padding: 8px 12px;
+  }
+  .main { padding: 14px; max-width: 100%; }
+  .table { display: block; overflow-x: auto; white-space: nowrap; }
+  .search { min-width: 0; width: 100%; }
+  .toolbar { gap: 6px; }
+  .modal { padding: 16px; max-height: 92vh; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 22px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .horoscope-grid { grid-template-columns: 1fr; }
+  .login-card { margin: 16px; padding: 24px; }
+}
