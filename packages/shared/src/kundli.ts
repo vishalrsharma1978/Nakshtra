@@ -3,12 +3,7 @@
 // (NASA-JPL-grade VSOP87/ELP2000 models); sidereal conversion uses the Lahiri
 // ayanamsa. Houses use the whole-sign system (standard for North Indian kundli).
 
-import {
-  Body,
-  Ecliptic,
-  GeoVector,
-  SiderealTime,
-} from 'astronomy-engine';
+import { Body, Ecliptic, GeoVector, SiderealTime } from "astronomy-engine";
 import {
   DASHA_SEQUENCE,
   EXALTATION,
@@ -22,7 +17,7 @@ import {
   VASHYA_BY_SIGN,
   YOGA_NAMES,
   type NakshatraInfo,
-} from './vedicData';
+} from "./vedicData";
 
 export interface BirthInput {
   /** Local date of birth, YYYY-MM-DD */
@@ -50,7 +45,7 @@ export interface PlanetPosition {
   /** House number 1-12, whole-sign from lagna */
   house: number;
   retrograde: boolean;
-  dignity: 'Exalted' | 'Debilitated' | 'Own Sign' | '-';
+  dignity: "Exalted" | "Debilitated" | "Own Sign" | "-";
 }
 
 export interface DashaPeriod {
@@ -62,7 +57,12 @@ export interface DashaPeriod {
 export interface Kundli {
   utcDate: Date;
   ayanamsa: number;
-  lagna: { longitude: number; signIndex: number; sign: string; degreeInSign: number };
+  lagna: {
+    longitude: number;
+    signIndex: number;
+    sign: string;
+    degreeInSign: number;
+  };
   planets: PlanetPosition[];
   moonSignIndex: number;
   moonSign: string;
@@ -71,7 +71,7 @@ export interface Kundli {
   sunSign: string;
   panchang: {
     tithi: string;
-    paksha: 'Shukla' | 'Krishna';
+    paksha: "Shukla" | "Krishna";
     yoga: string;
     karana: string;
     vara: string;
@@ -88,8 +88,27 @@ export interface Kundli {
   dashas: DashaPeriod[];
   /** Dasha running at birth */
   currentDashaAtBirth: string;
+  /** Headline flag: dosha present from Lagna or Moon and not cancelled */
   manglik: boolean;
+  /** Full Mangal (Kuja) Dosha assessment */
+  mangal: MangalDosha;
 }
+
+export interface MangalDosha {
+  manglik: boolean;
+  /** House of Mars counted from Lagna, Moon and Venus */
+  fromLagna: { house: number; dosha: boolean };
+  fromMoon: { house: number; dosha: boolean };
+  fromVenus: { house: number; dosha: boolean };
+  /** Reasons the dosha is cancelled (Parihara); empty when none apply */
+  cancellations: string[];
+  /** Raw dosha present before cancellation */
+  doshaBeforeCancellation: boolean;
+  severity: "None" | "Low" | "Medium" | "High";
+}
+
+/** Houses from which Mars causes Kuja Dosha (1, 2, 4, 7, 8, 12). */
+export const MANGAL_DOSHA_HOUSES = [1, 2, 4, 7, 8, 12];
 
 const DEG = Math.PI / 180;
 const NAK_LEN = 360 / 27; // 13°20'
@@ -104,15 +123,18 @@ export function lahiriAyanamsa(date: Date): number {
   const year = date.getUTCFullYear();
   const startOfYear = Date.UTC(year, 0, 1);
   const endOfYear = Date.UTC(year + 1, 0, 1);
-  const decimalYear = year + (date.getTime() - startOfYear) / (endOfYear - startOfYear);
+  const decimalYear =
+    year + (date.getTime() - startOfYear) / (endOfYear - startOfYear);
   return 23.853 + 0.0139666 * (decimalYear - 2000);
 }
 
 /** Converts local birth details to a UTC Date. */
 export function birthToUtc(input: BirthInput): Date {
-  const [y, m, d] = input.date.split('-').map(Number);
-  const [hh, mm] = input.time.split(':').map(Number);
-  return new Date(Date.UTC(y, m - 1, d, hh, mm) - input.utcOffsetMinutes * 60_000);
+  const [y, m, d] = input.date.split("-").map(Number);
+  const [hh, mm] = input.time.split(":").map(Number);
+  return new Date(
+    Date.UTC(y, m - 1, d, hh, mm) - input.utcOffsetMinutes * 60_000,
+  );
 }
 
 /** Tropical (sayana) geocentric ecliptic longitude of date for a body. */
@@ -128,7 +150,11 @@ function meanNodeTropical(date: Date): number {
 }
 
 /** Tropical ascendant from local sidereal time, latitude and obliquity. */
-function tropicalAscendant(date: Date, latitude: number, longitude: number): number {
+function tropicalAscendant(
+  date: Date,
+  latitude: number,
+  longitude: number,
+): number {
   const gastHours = SiderealTime(date); // Greenwich apparent sidereal time
   const ramc = norm360(gastHours * 15 + longitude); // local sidereal time in degrees
   const T = (date.getTime() - Date.UTC(2000, 0, 1, 12)) / 86_400_000 / 36525;
@@ -151,25 +177,35 @@ function navamsaIndex(longitude: number): number {
   return Math.floor(norm360(longitude) / PADA_LEN) % 12;
 }
 
-function dignityOf(planet: string, signIndex: number): PlanetPosition['dignity'] {
-  if (EXALTATION[planet] === signIndex) return 'Exalted';
-  if (EXALTATION[planet] !== undefined && (EXALTATION[planet] + 6) % 12 === signIndex) return 'Debilitated';
-  if (OWN_SIGNS[planet]?.includes(signIndex)) return 'Own Sign';
-  return '-';
+function dignityOf(
+  planet: string,
+  signIndex: number,
+): PlanetPosition["dignity"] {
+  if (EXALTATION[planet] === signIndex) return "Exalted";
+  if (
+    EXALTATION[planet] !== undefined &&
+    (EXALTATION[planet] + 6) % 12 === signIndex
+  )
+    return "Debilitated";
+  if (OWN_SIGNS[planet]?.includes(signIndex)) return "Own Sign";
+  return "-";
 }
 
 const BODY_MAP: { planet: string; body: Body }[] = [
-  { planet: 'Sun', body: Body.Sun },
-  { planet: 'Moon', body: Body.Moon },
-  { planet: 'Mars', body: Body.Mars },
-  { planet: 'Mercury', body: Body.Mercury },
-  { planet: 'Jupiter', body: Body.Jupiter },
-  { planet: 'Venus', body: Body.Venus },
-  { planet: 'Saturn', body: Body.Saturn },
+  { planet: "Sun", body: Body.Sun },
+  { planet: "Moon", body: Body.Moon },
+  { planet: "Mars", body: Body.Mars },
+  { planet: "Mercury", body: Body.Mercury },
+  { planet: "Jupiter", body: Body.Jupiter },
+  { planet: "Venus", body: Body.Venus },
+  { planet: "Saturn", body: Body.Saturn },
 ];
 
 /** Builds the vimshottari mahadasha table from the moon longitude. */
-export function vimshottariDashas(moonSidereal: number, birthUtc: Date): { dashas: DashaPeriod[]; atBirth: string } {
+export function vimshottariDashas(
+  moonSidereal: number,
+  birthUtc: Date,
+): { dashas: DashaPeriod[]; atBirth: string } {
   const nakIndex = Math.floor(norm360(moonSidereal) / NAK_LEN);
   const fraction = (norm360(moonSidereal) % NAK_LEN) / NAK_LEN;
   const startLordIndex = nakIndex % 9;
@@ -189,6 +225,87 @@ export function vimshottariDashas(moonSidereal: number, birthUtc: Date): { dasha
   return { dashas, atBirth: firstLord.lord };
 }
 
+/**
+ * Mangal (Kuja) Dosha assessment.
+ * - Dosha: Mars in houses 1, 2, 4, 7, 8, 12 counted from Lagna, Moon or Venus.
+ * - Headline `manglik` uses Lagna and Moon (the classical primary references) and is
+ *   cleared when a standard cancellation (Parihara) applies.
+ * - Cancellations: Mars in own sign (Aries, Scorpio) or exalted (Capricorn); Mars in
+ *   Leo or Aquarius; Mars conjunct Jupiter; and the classical house/sign exceptions
+ *   (2nd in Gemini/Virgo, 4th in Aries/Scorpio, 7th in Capricorn/Cancer,
+ *   8th in Sagittarius/Pisces, 12th in Taurus/Libra).
+ */
+export function assessMangalDosha(
+  mars: PlanetPosition,
+  moon: PlanetPosition,
+  venus: PlanetPosition,
+  jupiter: PlanetPosition,
+): MangalDosha {
+  const houseFrom = (ref: PlanetPosition) =>
+    ((mars.signIndex - ref.signIndex + 12) % 12) + 1;
+  const hLagna = mars.house;
+  const hMoon = houseFrom(moon);
+  const hVenus = houseFrom(venus);
+  const isDosha = (h: number) => MANGAL_DOSHA_HOUSES.includes(h);
+
+  const fromLagna = { house: hLagna, dosha: isDosha(hLagna) };
+  const fromMoon = { house: hMoon, dosha: isDosha(hMoon) };
+  const fromVenus = { house: hVenus, dosha: isDosha(hVenus) };
+  const doshaBeforeCancellation = fromLagna.dosha || fromMoon.dosha;
+
+  const cancellations: string[] = [];
+  if (doshaBeforeCancellation) {
+    const s = mars.signIndex; // 0 Aries ... 11 Pisces
+    if (s === 0 || s === 7)
+      cancellations.push(`Mars is in its own sign (${mars.sign})`);
+    if (s === 9) cancellations.push("Mars is exalted in Capricorn");
+    if (s === 4 || s === 10)
+      cancellations.push(
+        `Mars is in ${mars.sign} (dosha considered nullified)`,
+      );
+    if (s === jupiter.signIndex) cancellations.push("Mars is conjunct Jupiter");
+    const houseSignRules: Record<number, number[]> = {
+      2: [2, 5],
+      4: [0, 7],
+      7: [9, 3],
+      8: [8, 11],
+      12: [1, 6],
+    };
+    for (const h of [hLagna, hMoon]) {
+      if (houseSignRules[h]?.includes(s)) {
+        cancellations.push(
+          `Mars in house ${h} in ${mars.sign} is a classical exception`,
+        );
+        break;
+      }
+    }
+  }
+  const uniqueCancel = [...new Set(cancellations)];
+
+  const manglik = doshaBeforeCancellation && uniqueCancel.length === 0;
+  let severity: MangalDosha["severity"] = "None";
+  if (manglik) {
+    const count = [fromLagna.dosha, fromMoon.dosha, fromVenus.dosha].filter(
+      Boolean,
+    ).length;
+    severity =
+      count >= 3 || hLagna === 7 || hLagna === 8
+        ? "High"
+        : count === 2
+          ? "Medium"
+          : "Low";
+  }
+  return {
+    manglik,
+    fromLagna,
+    fromMoon,
+    fromVenus,
+    cancellations: uniqueCancel,
+    doshaBeforeCancellation,
+    severity,
+  };
+}
+
 /** Computes a complete Vedic kundli for the given birth details. */
 export function computeKundli(input: BirthInput): Kundli {
   const utcDate = birthToUtc(input);
@@ -196,7 +313,9 @@ export function computeKundli(input: BirthInput): Kundli {
   const toSidereal = (tropical: number) => norm360(tropical - ayanamsa);
 
   // Lagna
-  const lagnaSidereal = toSidereal(tropicalAscendant(utcDate, input.latitude, input.longitude));
+  const lagnaSidereal = toSidereal(
+    tropicalAscendant(utcDate, input.latitude, input.longitude),
+  );
   const lagnaSign = signOf(lagnaSidereal);
 
   // Planets
@@ -206,11 +325,23 @@ export function computeKundli(input: BirthInput): Kundli {
     const lon = tropicalLongitude(body, utcDate);
     const lonLater = tropicalLongitude(body, later);
     const delta = ((lonLater - lon + 540) % 360) - 180;
-    positions.push({ planet, lon: toSidereal(lon), retro: planet !== 'Sun' && planet !== 'Moon' && delta < 0 });
+    positions.push({
+      planet,
+      lon: toSidereal(lon),
+      retro: planet !== "Sun" && planet !== "Moon" && delta < 0,
+    });
   }
   const rahuTropical = meanNodeTropical(utcDate);
-  positions.push({ planet: 'Rahu', lon: toSidereal(rahuTropical), retro: true });
-  positions.push({ planet: 'Ketu', lon: toSidereal(rahuTropical + 180), retro: true });
+  positions.push({
+    planet: "Rahu",
+    lon: toSidereal(rahuTropical),
+    retro: true,
+  });
+  positions.push({
+    planet: "Ketu",
+    lon: toSidereal(rahuTropical + 180),
+    retro: true,
+  });
 
   const planets: PlanetPosition[] = positions.map(({ planet, lon, retro }) => {
     const { signIndex, degreeInSign } = signOf(lon);
@@ -233,24 +364,30 @@ export function computeKundli(input: BirthInput): Kundli {
     };
   });
 
-  const moon = planets.find((p) => p.planet === 'Moon')!;
-  const sun = planets.find((p) => p.planet === 'Sun')!;
-  const mars = planets.find((p) => p.planet === 'Mars')!;
+  const moon = planets.find((p) => p.planet === "Moon")!;
+  const sun = planets.find((p) => p.planet === "Sun")!;
+  const mars = planets.find((p) => p.planet === "Mars")!;
 
   // Panchang at birth
   const elongation = norm360(moon.longitude - sun.longitude);
   const tithiNumber = Math.floor(elongation / 12); // 0-29
-  const paksha: 'Shukla' | 'Krishna' = tithiNumber < 15 ? 'Shukla' : 'Krishna';
+  const paksha: "Shukla" | "Krishna" = tithiNumber < 15 ? "Shukla" : "Krishna";
   const tithiInPaksha = tithiNumber % 15;
   const tithi =
     tithiInPaksha === 14
-      ? paksha === 'Shukla' ? 'Purnima' : 'Amavasya'
+      ? paksha === "Shukla"
+        ? "Purnima"
+        : "Amavasya"
       : TITHI_NAMES[tithiInPaksha];
-  const yoga = YOGA_NAMES[Math.floor(norm360(moon.longitude + sun.longitude) / NAK_LEN) % 27];
+  const yoga =
+    YOGA_NAMES[
+      Math.floor(norm360(moon.longitude + sun.longitude) / NAK_LEN) % 27
+    ];
   const karanaNumber = Math.floor(elongation / 6); // 0-59
   let karana: string;
-  if (karanaNumber === 0) karana = 'Kimstughna';
-  else if (karanaNumber >= 57) karana = ['Shakuni', 'Chatushpada', 'Naga'][karanaNumber - 57];
+  if (karanaNumber === 0) karana = "Kimstughna";
+  else if (karanaNumber >= 57)
+    karana = ["Shakuni", "Chatushpada", "Naga"][karanaNumber - 57];
   else karana = KARANA_NAMES[(karanaNumber - 1) % 7];
   // Vara uses local midnight-based weekday
   const localMs = utcDate.getTime() + input.utcOffsetMinutes * 60_000;
@@ -258,10 +395,10 @@ export function computeKundli(input: BirthInput): Kundli {
 
   const { dashas, atBirth } = vimshottariDashas(moon.longitude, utcDate);
 
-  // Manglik: Mars in 1, 2, 4, 7, 8 or 12 from lagna or from moon
-  const MANGLIK_HOUSES = [1, 2, 4, 7, 8, 12];
-  const marsFromMoon = ((mars.signIndex - moon.signIndex + 12) % 12) + 1;
-  const manglik = MANGLIK_HOUSES.includes(mars.house) || MANGLIK_HOUSES.includes(marsFromMoon);
+  const venus = planets.find((p) => p.planet === "Venus")!;
+  const jupiter = planets.find((p) => p.planet === "Jupiter")!;
+  const mangal = assessMangalDosha(mars, moon, venus, jupiter);
+  const manglik = mangal.manglik;
 
   return {
     utcDate,
@@ -291,6 +428,7 @@ export function computeKundli(input: BirthInput): Kundli {
     dashas,
     currentDashaAtBirth: atBirth,
     manglik,
+    mangal,
   };
 }
 

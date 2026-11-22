@@ -1,4 +1,4 @@
-import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { NavigatorScreenParams } from "@react-navigation/native";
 
 export type TabsParamList = {
   Home: undefined;
@@ -10,9 +10,10 @@ export type TabsParamList = {
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabsParamList>;
   Kundli: undefined;
+  AstrologerChat: undefined;
   NewQuestion: undefined;
   QuestionDetail: { questionId: string };
   ExpertDetail: { expertId: string };
-  Payment: { purpose: 'question_fast_track' | 'consultation'; refId: string };
+  Payment: { purpose: "question_fast_track" | "consultation"; refId: string };
   VideoCall: { room: string; title?: string };
 };

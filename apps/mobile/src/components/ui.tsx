@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,20 +8,20 @@ import {
   View,
   type TextInputProps,
   type ViewStyle,
-} from 'react-native';
-import { colors, spacing } from '../theme';
+} from "react-native";
+import { colors, spacing } from "../theme";
 
 export function Button({
   title,
   onPress,
-  variant = 'primary',
+  variant = "primary",
   disabled,
   loading,
   style,
 }: {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'outline' | 'danger';
+  variant?: "primary" | "outline" | "danger";
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
@@ -32,17 +32,24 @@ export function Button({
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.button,
-        variant === 'outline' && styles.buttonOutline,
-        variant === 'danger' && styles.buttonDanger,
+        variant === "outline" && styles.buttonOutline,
+        variant === "danger" && styles.buttonDanger,
         (disabled || loading) && styles.buttonDisabled,
         pressed && styles.buttonPressed,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? colors.primary : '#fff'} />
+        <ActivityIndicator
+          color={variant === "outline" ? colors.primary : colors.onPrimary}
+        />
       ) : (
-        <Text style={[styles.buttonText, variant === 'outline' && styles.buttonTextOutline]}>
+        <Text
+          style={[
+            styles.buttonText,
+            variant === "outline" && styles.buttonTextOutline,
+          ]}
+        >
           {title}
         </Text>
       )}
@@ -64,19 +71,44 @@ export function Input(props: TextInputProps & { label?: string }) {
   );
 }
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function Card({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: ViewStyle;
+}) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-export function Chip({ label, active, onPress }: { label: string; active?: boolean; onPress?: () => void }) {
+export function Chip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active?: boolean;
+  onPress?: () => void;
+}) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      style={[styles.chip, active && styles.chipActive]}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
-export function Screen({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function Screen({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: ViewStyle;
+}) {
   return <View style={[styles.screen, style]}>{children}</View>;
 }
 
@@ -94,20 +126,25 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
-    alignItems: 'center',
+    alignItems: "center",
   },
   buttonOutline: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 1.5,
     borderColor: colors.primary,
   },
   buttonDanger: { backgroundColor: colors.danger },
   buttonDisabled: { opacity: 0.5 },
   buttonPressed: { opacity: 0.8 },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  buttonText: { color: colors.onPrimary, fontWeight: "600", fontSize: 16 },
   buttonTextOutline: { color: colors.primary },
   inputWrap: { marginBottom: spacing.md },
-  inputLabel: { color: colors.textMuted, marginBottom: spacing.xs, fontSize: 13, fontWeight: '500' },
+  inputLabel: {
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+    fontSize: 13,
+    fontWeight: "500",
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -135,8 +172,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   chipActive: { backgroundColor: colors.primary },
-  chipText: { color: colors.primaryDark, fontWeight: '500' },
-  chipTextActive: { color: '#fff' },
+  chipText: { color: colors.primaryDark, fontWeight: "500" },
+  chipTextActive: { color: colors.onPrimary },
   screen: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bg,
+  },
 });

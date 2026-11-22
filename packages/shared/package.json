@@ -6,7 +6,7 @@
   "types": "src/index.ts",
   "sideEffects": false,
   "scripts": {
-    "test": "tsx --test tests/zodiac.test.ts tests/sla.test.ts tests/kundli.test.ts"
+    "test": "tsx --test tests/zodiac.test.ts tests/sla.test.ts tests/kundli.test.ts tests/kundliExtras.test.ts tests/kundliSummary.test.ts tests/mangal.test.ts tests/guruEngine.test.ts tests/guruKnowledge.test.ts tests/birthFields.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.0"
