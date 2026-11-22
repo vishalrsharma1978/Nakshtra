@@ -258,6 +258,10 @@ export default function AuthScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            returnKeyType={mode === "signin" ? "go" : "done"}
+            onSubmitEditing={() => {
+              if (!busy) void submit();
+            }}
           />
 
           <Button

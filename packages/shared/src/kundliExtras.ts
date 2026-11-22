@@ -3,7 +3,7 @@
 // Arudha Lagna, Bhrigu Bindu, Vimshottari antardashas and Varshaphal (solar return).
 
 import { Body, Observer, SearchRiseSet } from "astronomy-engine";
-import { OWN_SIGNS, RASHIS } from "./vedicData";
+import { OWN_SIGNS, PLANET_HI, RASHIS } from "./vedicData";
 import {
   computeKundli,
   norm360,
@@ -699,6 +699,57 @@ export function varshaphalPredictions(v: Varshaphal, natal: Kundli): string[] {
   if ([1, 4, 7, 8, 12].includes(mars.house)) {
     lines.push(
       `Mars in house ${mars.house} of the annual chart: avoid haste and conflict; channel energy into exercise and work.`,
+    );
+  }
+  return lines;
+}
+
+const MUNTHA_HOUSE_TEXT_HI: Record<number, string> = {
+  1: "नई शुरुआत, बढ़ी हुई ऊर्जा और आत्मविश्वास का वर्ष",
+  2: "परिवार, बचत और वाणी पर ध्यान; धन का स्थिर संचय",
+  3: "साहस, छोटी यात्राएँ और परिश्रम व संवाद से सफलता",
+  4: "घरेलू सुख, भूमि-वाहन संबंधी कार्य और मानसिक शांति",
+  5: "रचनात्मकता, शिक्षा, संतान और पूर्व पुण्य से लाभ",
+  6: "प्रतिस्पर्धा और सेवा; स्वास्थ्य पर ध्यान, शत्रु पर विजय",
+  7: "साझेदारी, विवाह की संभावना और व्यापारिक सहयोग",
+  8: "परिवर्तन और अचानक बदलाव; जोखिम से बचें, स्वास्थ्य का ध्यान रखें",
+  9: "भाग्य, उच्च शिक्षा, आध्यात्मिक उन्नति और लंबी यात्राएँ",
+  10: "कार्यक्षेत्र में उन्नति, सम्मान और बढ़ी हुई ज़िम्मेदारी",
+  11: "लाभ, इच्छापूर्ति और मित्रों-बड़ों का सहयोग",
+  12: "खर्च, विदेश संबंध और एकांत; व्यय पर नियंत्रण रखें",
+};
+
+/** Hindi version of varshaphalPredictions (same rules, Devanagari text). */
+export function varshaphalPredictionsHi(
+  v: Varshaphal,
+  natal: Kundli,
+): string[] {
+  const munthaHouse =
+    ((v.munthaSignIndex - natal.lagna.signIndex + 12) % 12) + 1;
+  const hi = (planet: string) => PLANET_HI[planet] ?? planet;
+  const lines: string[] = [];
+  lines.push(
+    `मुंथा ${RASHIS[v.munthaSignIndex].hi} राशि (जन्म कुण्डली के ${munthaHouse} वें भाव) में है: ${MUNTHA_HOUSE_TEXT_HI[munthaHouse]}।`,
+  );
+  lines.push(
+    `वर्ष का स्वामी (वर्षेश) ${hi(v.yearLord)} है; इस वर्ष की घटनाओं में उसके विषयों की प्रधानता रहेगी।`,
+  );
+  const jup = v.kundli.planets.find((p) => p.planet === "Jupiter")!;
+  const sat = v.kundli.planets.find((p) => p.planet === "Saturn")!;
+  lines.push(
+    [1, 2, 4, 5, 7, 9, 10, 11].includes(jup.house)
+      ? `वर्ष कुण्डली में गुरु ${jup.house} वें भाव में है — कृपा, वृद्धि और संरक्षण देता है।`
+      : `वर्ष कुण्डली में गुरु ${jup.house} वें भाव में है — धैर्य रखें, फल देर से मिलेंगे।`,
+  );
+  lines.push(
+    [3, 6, 10, 11].includes(sat.house)
+      ? `वर्ष कुण्डली में शनि ${sat.house} वें भाव में है — अनुशासन, परिश्रम और दीर्घकालिक योजना का फल देता है।`
+      : `वर्ष कुण्डली में शनि ${sat.house} वें भाव में है — वचनबद्धता, स्वास्थ्य और धन के मामलों में सावधानी रखें।`,
+  );
+  const mars = v.kundli.planets.find((p) => p.planet === "Mars")!;
+  if ([1, 4, 7, 8, 12].includes(mars.house)) {
+    lines.push(
+      `वर्ष कुण्डली में मंगल ${mars.house} वें भाव में है — जल्दबाज़ी और विवाद से बचें, ऊर्जा को व्यायाम व कार्य में लगाएँ।`,
     );
   }
   return lines;
