@@ -63,7 +63,10 @@ export function vargaSign(longitude: number, division: number): number {
   const lon = norm360(longitude);
   const signIndex = Math.floor(lon / 30);
   const deg = lon - signIndex * 30;
-  const part = (n: number) => Math.min(Math.floor(deg / (30 / n)), n - 1);
+  // Multiply (not divide by 30/n) and add a tiny epsilon so exact part boundaries
+  // (e.g. 10° for D3, D9, D12) don't fall into the previous part through float error.
+  const part = (n: number) =>
+    Math.min(Math.floor((deg * n) / 30 + 1e-9), n - 1);
   const odd = isOdd(signIndex);
 
   switch (division) {
@@ -149,7 +152,7 @@ export function vargaSign(longitude: number, division: number): number {
       return (start + part(45)) % 12;
     }
     case 60:
-      return (signIndex + Math.min(Math.floor(deg * 2), 59)) % 12;
+      return (signIndex + Math.min(Math.floor(deg * 2 + 1e-9), 59)) % 12;
     default:
       return signIndex;
   }

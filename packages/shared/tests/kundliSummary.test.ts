@@ -49,3 +49,34 @@ test("AI kundli summary covers all charts, dashas, transit and varshaphal", () =
   }
   assert.ok(s.length < 12000, `summary too long: ${s.length}`);
 });
+
+test("AI context lists the only dates the AI may quote, all from computed tables", () => {
+  const k = computeKundli(INPUT);
+  const s = summarizeKundliForAi(INPUT, k, {
+    now: new Date(Date.UTC(2026, 0, 15)),
+  });
+  assert.ok(s.includes("ALLOWED DATES"));
+  const allowedBlock = s.slice(s.indexOf("ALLOWED DATES"));
+  // Every Mahadasha boundary is listed exactly as computed
+  for (const d of k.dashas) {
+    const start = d.start.toISOString().slice(0, 10);
+    const end = d.end.toISOString().slice(0, 10);
+    assert.ok(
+      allowedBlock.includes(`${d.lord} Mahadasha: ${start} to ${end}`),
+      `missing ${d.lord} mahadasha`,
+    );
+  }
+  // Every date in the allowed block is a computed dasha/antardasha/varsha date
+  const computed = new Set<string>();
+  for (const d of k.dashas) {
+    computed.add(d.start.toISOString().slice(0, 10));
+    computed.add(d.end.toISOString().slice(0, 10));
+  }
+  for (const m of allowedBlock.matchAll(/\d{4}-\d{2}-\d{2}/g)) {
+    const inAntar = s.slice(0, s.indexOf("ALLOWED DATES")).includes(m[0]);
+    assert.ok(
+      computed.has(m[0]) || inAntar,
+      `date ${m[0]} is not backed by a computed table`,
+    );
+  }
+});

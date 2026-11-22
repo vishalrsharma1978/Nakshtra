@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  ZODIAC_SIGNS,
+  dailyHoroscopeFor,
+  localIsoDate,
   answerQuestion,
   buildGuruContext,
   computeKundli,
@@ -23,6 +26,39 @@ const NOW = new Date(Date.UTC(2026, 0, 15));
 const ctx = buildGuruContext(INPUT, computeKundli(INPUT), {
   name: "Asha Verma",
   now: NOW,
+});
+
+test("daily horoscope works for every sign and never shows undefined", () => {
+  for (let i = 0; i < 12; i++) {
+    const h = dailyHoroscopeFor(i, "2026-03-14");
+    assert.equal(h.sign.key, ZODIAC_SIGNS[i].key);
+    assert.ok(h.text.length > 150, `short text for sign ${i}`);
+    assert.ok(!/undefined|NaN|null/.test(h.text + h.luckyColour + h.mood));
+    for (const r of Object.values(h.ratings)) assert.ok(r >= 1 && r <= 5);
+    assert.ok(h.luckyNumber >= 1 && h.luckyNumber <= 9);
+  }
+});
+
+test("daily horoscope is stable for a day but changes on other days", () => {
+  const a = dailyHoroscopeFor(3, "2026-03-14");
+  const b = dailyHoroscopeFor(3, "2026-03-14");
+  assert.equal(a.text, b.text);
+  const texts = new Set<string>();
+  for (let d = 1; d <= 20; d++) {
+    const day = String(d).padStart(2, "0");
+    texts.add(dailyHoroscopeFor(3, `2026-03-${day}`).text);
+  }
+  assert.ok(texts.size > 3, "forecast should vary across days");
+});
+
+test("daily horoscope differs between signs on the same day", () => {
+  const set = new Set<string>();
+  for (let i = 0; i < 12; i++) set.add(dailyHoroscopeFor(i, "2026-03-14").text);
+  assert.ok(set.size > 4);
+});
+
+test("localIsoDate formats the local calendar day", () => {
+  assert.equal(localIsoDate(new Date(2026, 2, 5)), "2026-03-05");
 });
 
 test("digitalRoot reduces to a single digit", () => {

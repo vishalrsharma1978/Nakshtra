@@ -19,9 +19,12 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
+  answerQuestion,
+  buildGuruContext,
   computeKundli,
   summarizeKundliForAi,
   type BirthInput,
+  type GuruContext,
 } from "@nakshtra/shared";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -61,6 +64,8 @@ export default function AstrologerChatScreen() {
   const [voiceReplies, setVoiceReplies] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [kundliText, setKundliText] = useState<string | null>(null);
+  // Same kundli, as a context for the built-in guru (used when the AI service is unavailable)
+  const [guruCtx, setGuruCtx] = useState<GuruContext | null>(null);
   const [kundliStatus, setKundliStatus] = useState<
     "loading" | "ready" | "missing"
   >("loading");
@@ -95,8 +100,12 @@ export default function AstrologerChatScreen() {
           name: profile.full_name ?? undefined,
           place: profile.birth_place,
         });
+        const ctx = buildGuruContext(birth, k, {
+          name: profile.full_name ?? undefined,
+        });
         if (!cancelled) {
           setKundliText(text);
+          setGuruCtx(ctx);
           setKundliStatus("ready");
         }
       } catch {
@@ -122,17 +131,17 @@ export default function AstrologerChatScreen() {
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: true })
       .limit(60)
-      .then(({ data }) => {
-        if (data?.length) {
-          setMessages(
-            data.map((m) => ({
-              id: m.id as string,
-              role: m.role as "user" | "assistant",
-              content: m.content as string,
-              suggestExpert: m.suggest_expert as boolean,
-            })),
-          );
-        }
+      .then(({ data, error }) => {
+        // If the history table does not exist yet, just start a fresh chat
+        if (error || !data?.length) return;
+        setMessages(
+          data.map((m) => ({
+            id: m.id as string,
+            role: m.role as "user" | "assistant",
+            content: m.content as string,
+            suggestExpert: m.suggest_expert as boolean,
+          })),
+        );
       });
   }, [session]);
 
@@ -164,25 +173,37 @@ export default function AstrologerChatScreen() {
       setBusy(true);
       scrollToEnd();
       try {
-        const { data, error } = await supabase.functions.invoke(
-          "ai-astrologer",
-          {
-            body: {
-              messages: next
-                .slice(-14)
-                .map((m) => ({ role: m.role, content: m.content })),
-              kundli: kundliText ?? "",
-              language: lang,
+        let reply: string;
+        let suggestExpert = false;
+        try {
+          const { data, error } = await supabase.functions.invoke(
+            "ai-astrologer",
+            {
+              body: {
+                messages: next
+                  .slice(-14)
+                  .map((m) => ({ role: m.role, content: m.content })),
+                kundli: kundliText ?? "",
+                language: lang,
+              },
             },
-          },
-        );
-        if (error) throw new Error(error.message);
-        if (data?.error) throw new Error(data.error);
+          );
+          if (error) throw new Error(error.message);
+          if (data?.error) throw new Error(data.error);
+          reply = data.reply as string;
+          suggestExpert = Boolean(data.suggestExpert);
+        } catch {
+          // The AI service is not set up or is down: answer with the built-in guru
+          // so the chat always works.
+          const a = answerQuestion(text, guruCtx, lang);
+          reply = a.simple ?? a.text;
+          suggestExpert = a.suggestExpert;
+        }
         const botMsg: Msg = {
           id: `a${Date.now()}`,
           role: "assistant",
-          content: data.reply as string,
-          suggestExpert: Boolean(data.suggestExpert),
+          content: reply,
+          suggestExpert,
         };
         setMessages((prev) => [...prev, botMsg]);
         if (voiceReplies) {
@@ -206,7 +227,7 @@ export default function AstrologerChatScreen() {
         scrollToEnd();
       }
     },
-    [input, busy, messages, kundliText, lang, voiceReplies],
+    [input, busy, messages, kundliText, guruCtx, lang, voiceReplies],
   );
 
   const toggleMic = () => {

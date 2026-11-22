@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Image,
   RefreshControl,
@@ -10,9 +10,18 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getSunSign, getSignByKey, type Horoscope } from "@nakshtra/shared";
+import {
+  ZODIAC_SIGNS,
+  computeKundli,
+  dailyHoroscopeFor,
+  getSunSign,
+  getSignByKey,
+  localIsoDate,
+  type Horoscope,
+} from "@nakshtra/shared";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { searchPlaces, timezoneOffsetMinutes } from "../lib/geocode";
 import { Card } from "../components/ui";
 import { colors, spacing } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
@@ -23,29 +32,75 @@ export default function HomeScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [horoscope, setHoroscope] = useState<Horoscope | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Moon sign (Chandra Rashi) from the saved birth details, when available
+  const [moonIndex, setMoonIndex] = useState<number | null>(null);
 
-  const sign = profile?.dob
+  const sunSign = profile?.dob
     ? getSunSign(profile.dob)
     : profile?.zodiac_sign
       ? getSignByKey(profile.zodiac_sign)
       : null;
+  // Indian daily horoscopes are read from the Moon sign; fall back to the sun sign
+  const sign = moonIndex !== null ? ZODIAC_SIGNS[moonIndex] : sunSign;
 
+  // Work out the Moon sign once the full birth details are saved in Profile
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!profile?.dob || !profile.birth_time || !profile.birth_place) {
+        setMoonIndex(null);
+        return;
+      }
+      try {
+        const place = (await searchPlaces(profile.birth_place))[0];
+        if (!place) throw new Error("place not found");
+        const time = profile.birth_time.slice(0, 5);
+        const k = computeKundli({
+          date: profile.dob,
+          time,
+          utcOffsetMinutes: timezoneOffsetMinutes(
+            place.timezone,
+            new Date(`${profile.dob}T${time}:00`),
+          ),
+          latitude: place.latitude,
+          longitude: place.longitude,
+        });
+        if (!cancelled) setMoonIndex(k.moonSignIndex);
+      } catch {
+        if (!cancelled) setMoonIndex(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.dob, profile?.birth_time, profile?.birth_place]);
+
+  const today = localIsoDate();
+  // Always available: generated from today's real planetary positions
+  const daily = useMemo(
+    () => (sign ? dailyHoroscopeFor(ZODIAC_SIGNS.indexOf(sign), today) : null),
+    [sign, today],
+  );
+
+  // An editor-written horoscope (admin panel) for today overrides the generated one
   const loadHoroscope = useCallback(async () => {
     if (!sign) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const { data } = await supabase
-      .from("horoscopes")
-      .select("*")
-      .eq("sign", sign.key)
-      .eq("for_date", today)
-      .in("language", [lang, "en"])
-      .order("language", { ascending: lang === "en" });
-    setHoroscope(
-      (data?.find((h) => h.language === lang) ??
-        data?.[0] ??
-        null) as Horoscope | null,
-    );
-  }, [sign?.key, lang]);
+    try {
+      const { data } = await supabase
+        .from("horoscopes")
+        .select("*")
+        .eq("sign", sign.key)
+        .eq("for_date", today)
+        .in("language", [lang, "en"]);
+      setHoroscope(
+        (data?.find((h) => h.language === lang) ??
+          data?.[0] ??
+          null) as Horoscope | null,
+      );
+    } catch {
+      setHoroscope(null);
+    }
+  }, [sign?.key, lang, today]);
 
   useEffect(() => {
     void loadHoroscope();
@@ -123,9 +178,44 @@ export default function HomeScreen() {
                 <Text style={styles.signMeta}>{sign.element}</Text>
               </View>
             </View>
-            <Text style={styles.horoscopeText}>
-              {horoscope?.content ?? t("noHoroscopeToday")}
-            </Text>
+            {horoscope?.content ? (
+              <Text style={styles.horoscopeText}>{horoscope.content}</Text>
+            ) : daily ? (
+              <>
+                <Text style={styles.dailyHeadline}>{daily.headline}</Text>
+                <Text style={styles.horoscopeText}>{daily.text}</Text>
+                <View style={styles.ratingGrid}>
+                  {(
+                    [
+                      ["❤️ Love", daily.ratings.love],
+                      ["💼 Career", daily.ratings.career],
+                      ["💰 Money", daily.ratings.money],
+                      ["🌿 Health", daily.ratings.health],
+                    ] as [string, number][]
+                  ).map(([label, n]) => (
+                    <View key={label} style={styles.ratingItem}>
+                      <Text style={styles.ratingLabel}>{label}</Text>
+                      <Text style={styles.ratingStars}>
+                        {"★".repeat(n)}
+                        {"☆".repeat(5 - n)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={styles.luckyLine}>
+                  🎨 Lucky colour: {daily.luckyColour} · 🔢 Lucky number:{" "}
+                  {daily.luckyNumber} · ⏰ Best time: {daily.luckyTime}
+                </Text>
+                <Text style={styles.luckyLine}>Mood: {daily.mood}</Text>
+                <Text style={styles.basisNote}>
+                  {moonIndex !== null
+                    ? `Based on your Moon sign (${sign.en}) and today's planets.`
+                    : `Based on your sun sign. Save your birth time and place in Profile for a Moon-sign forecast.`}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.horoscopeText}>{t("noHoroscopeToday")}</Text>
+            )}
           </>
         ) : (
           <Text style={styles.horoscopeText}>{t("setDobPrompt")}</Text>
@@ -188,6 +278,35 @@ const styles = StyleSheet.create({
   signName: { fontSize: 18, fontWeight: "600", color: colors.primary },
   signMeta: { color: colors.textMuted, fontSize: 13 },
   horoscopeText: { color: colors.text, lineHeight: 22 },
+  dailyHeadline: {
+    color: colors.primary,
+    fontWeight: "700",
+    fontSize: 15,
+    marginBottom: spacing.xs,
+  },
+  ratingGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  ratingItem: {
+    width: "48%",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.sm,
+    backgroundColor: colors.chipBg,
+  },
+  ratingLabel: { color: colors.textMuted, fontSize: 12 },
+  ratingStars: { color: colors.primary, fontSize: 16, letterSpacing: 1 },
+  luckyLine: { color: colors.text, fontSize: 13, marginTop: spacing.sm },
+  basisNote: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: spacing.sm,
+    fontStyle: "italic",
+  },
   serviceCard: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   serviceIcon: { fontSize: 28 },
   serviceTitle: { fontSize: 16, fontWeight: "600", color: colors.text },

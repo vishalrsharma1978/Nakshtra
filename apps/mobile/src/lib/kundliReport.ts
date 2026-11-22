@@ -241,27 +241,26 @@ export function buildKundliHtml(
   const pt = (p: { sign: string; degreeInSign: number }) =>
     `${p.sign} ${formatDegree(p.degreeInSign)}`;
 
-  const pagePlanets = `
-    <h2 class="doc-subtitle" style="margin-top:0">Planetary Positions · ग्रह स्थिति</h2>
+  // Compact layout: D1 + D9 sit with the planet table; the other vargas go 6 per page (3 x 2)
+  const mainCharts = vargas.filter((c) => c.code === "D1" || c.code === "D9");
+  const otherCharts = vargas.filter((c) => c.code !== "D1" && c.code !== "D9");
+  const pageMain = `
+    <h2 class="doc-subtitle" style="margin-top:0">Lagna &amp; Navamsa · लग्न एवं नवांश कुण्डली</h2>
+    <div class="charts">${mainCharts.map((c) => chartFromVarga(c, accent)).join("")}</div>
+    <h3 class="section-title">Planetary Positions · ग्रह स्थिति</h3>
     <table class="data">
       <tr><th>Planet</th><th>Rashi</th><th>Degree</th><th>Nakshatra–Pada</th><th>Navamsa</th><th>House</th><th>Motion</th><th>Dignity</th></tr>
       ${planetRows}
     </table>
-    <h3 class="section-title">Special Points · विशेष बिंदु</h3>
-    <table class="kv">
-      <tr><td>Gulika (Gk)</td><td>${pt(special.gulika)}</td><td>Mandi (Md)</td><td>${pt(special.mandi)}</td></tr>
-      <tr><td>Arudha Lagna (AL)</td><td>${special.arudhaLagna.sign}</td><td>Bhrigu Bindu (BP)</td><td>${pt(special.bhriguBindu)}</td></tr>
-      <tr><td>Sunrise</td><td>${fmtTime(special.sunrise)}</td><td>Sunset</td><td>${fmtTime(special.sunset)}</td></tr>
-    </table>
-    <p class="note">Every chart in this report shows Gulika (Gk), Mandi (Md), Arudha Lagna (AL) and Bhrigu Bindu (BP).</p>`;
-
-  // Two divisional charts per page
+    <p class="note">Charts also show Gulika (Gk), Mandi (Md), Arudha Lagna (AL) and Bhrigu Bindu (BP). Gulika ${pt(special.gulika)} · Mandi ${pt(special.mandi)} · Bhrigu Bindu ${pt(special.bhriguBindu)} · Arudha Lagna ${special.arudhaLagna.sign} · Sunrise ${fmtTime(special.sunrise)} · Sunset ${fmtTime(special.sunset)}.</p>`;
   const chartPages: string[] = [];
-  for (let i = 0; i < vargas.length; i += 2) {
-    const pair = vargas.slice(i, i + 2);
+  for (let i = 0; i < otherCharts.length; i += 6) {
     chartPages.push(`
     <h2 class="doc-subtitle" style="margin-top:0">Divisional Charts · वर्ग कुण्डली</h2>
-    <div class="charts">${pair.map((c) => chartFromVarga(c, accent)).join("")}</div>`);
+    <div class="charts grid3">${otherCharts
+      .slice(i, i + 6)
+      .map((c) => chartFromVarga(c, accent))
+      .join("")}</div>`);
   }
 
   const transitRows = transit.planets
@@ -270,14 +269,22 @@ export function buildKundliHtml(
         `<tr><td>${p.planet}</td><td>${p.sign}</td><td>${formatDegree(p.degreeInSign)}</td><td>${p.house}</td><td>${transit.fromMoon[i].house}</td></tr>`,
     )
     .join("");
-  const pageTransit = `
-    <h2 class="doc-subtitle" style="margin-top:0">Transit Chart · गोचर कुण्डली</h2>
-    <p class="note">Planetary positions as on <strong>${fmtDate(transit.date)}</strong>, drawn over your natal Lagna.</p>
-    <div class="charts">${chartFromVarga(transit.chart, accent, "Gochar · " + fmtDate(transit.date))}
-      <div class="chart-box"><table class="data">
-        <tr><th>Planet</th><th>Sign</th><th>Degree</th><th>House (Lagna)</th><th>House (Moon)</th></tr>
+  const antarRowsData = antar;
+  const pageTransitVarsha = `
+    <h2 class="doc-subtitle" style="margin-top:0">Transit &amp; Varshaphal ${varsha.year} · गोचर एवं वर्षफल</h2>
+    <div class="charts">
+      ${chartFromVarga(transit.chart, accent, "Gochar · " + fmtDate(transit.date))}
+      ${chartFromVarga(varsha.chart, accent, `Varsha Kundli ${varsha.year}`)}
+    </div>
+    <div class="charts">
+      <div class="chart-box"><table class="data compact">
+        <tr><th>Planet</th><th>Sign</th><th>Degree</th><th>H (Lagna)</th><th>H (Moon)</th></tr>
         ${transitRows}
       </table></div>
+      <div class="chart-box">
+        <p class="note" style="margin-top:0">Solar return <strong>${fmtDate(varsha.returnDate)}</strong> (age ${varsha.age}) · Varsha Lagna <strong>${varsha.kundli.lagna.sign}</strong> · Muntha <strong>${RASHIS[varsha.munthaSignIndex].en}</strong> · Year lord <strong>${varsha.yearLord}</strong></p>
+        <ul class="pred">${varshaNotes.map((n) => `<li>${n}</li>`).join("")}</ul>
+      </div>
     </div>`;
 
   const SIGN_ABBR = RASHIS.map((r) => r.en.slice(0, 3));
@@ -288,51 +295,41 @@ export function buildKundliHtml(
         `<tr><td><strong>${pl}</strong></td>${ashtak.bav[pl].map((v) => `<td>${v}</td>`).join("")}<td><strong>${ashtak.totals[pl]}</strong></td></tr>`,
     )
     .join("");
-  const pageAshtak = `
-    <h2 class="doc-subtitle" style="margin-top:0">Ashtakavarga · अष्टकवर्ग</h2>
-    <table class="data">
+  const pageAshtakDasha = `
+    <h2 class="doc-subtitle" style="margin-top:0">Ashtakavarga &amp; Mahadasha · अष्टकवर्ग एवं महादशा</h2>
+    <table class="data compact">
       <tr><th>Planet</th>${SIGN_ABBR.map((s) => `<th>${s}</th>`).join("")}<th>Total</th></tr>
       ${ashtakRows}
       <tr><td><strong>Sarva</strong></td>${ashtak.sav.map((v) => `<td><strong>${v}</strong></td>`).join("")}<td><strong>${ashtak.sav.reduce((a, b) => a + b, 0)}</strong></td></tr>
     </table>
-    <p class="note">Bindus (benefic points) each planet contributes to every sign, by the Parashari system. Signs with 28+ Sarvashtakavarga points are strong; below 25 are weak.</p>`;
-
-  const antarRows = antar
-    .map((a) => {
-      const cur = a.start.getTime() <= now && now < a.end.getTime();
-      return `<tr${cur ? ' class="current"' : ""}><td>${a.mahadasha}</td><td>${a.lord}</td><td>${fmtDate(a.start)}</td><td>${fmtDate(a.end)}</td></tr>`;
-    })
-    .join("");
-  const pageDasha = `
-    <h2 class="doc-subtitle" style="margin-top:0">Vimshottari Mahadasha · विंशोत्तरी महादशा</h2>
-    <p class="note">Dasha balance at birth: <strong>${k.currentDashaAtBirth} Mahadasha</strong> was running at the time of birth.</p>
-    <table class="data dasha">
+    <p class="note">Signs with 28+ Sarvashtakavarga points are strong; below 25 are weak (Parashari system).</p>
+    <h3 class="section-title">Vimshottari Mahadasha · विंशोत्तरी महादशा</h3>
+    <p class="note">Dasha at birth: <strong>${k.currentDashaAtBirth} Mahadasha</strong>.</p>
+    <table class="data compact dasha">
       <tr><th>Mahadasha Lord</th><th>From</th><th>To</th></tr>
       ${dashaRows}
     </table>`;
-  // Antardasha table split in chunks so it flows across pages
-  const antarChunks: string[] = [];
-  const antarRowList = antarRows
-    .split("</tr>")
-    .filter(Boolean)
-    .map((r) => r + "</tr>");
-  for (let i = 0; i < antarRowList.length; i += 32) {
-    antarChunks.push(`
-    <h2 class="doc-subtitle" style="margin-top:0">Antardasha Periods · अंतर्दशा</h2>
-    <table class="data compact">
-      <tr><th>Mahadasha</th><th>Antardasha</th><th>From</th><th>To</th></tr>
-      ${antarRowList.slice(i, i + 32).join("")}
-    </table>`);
-  }
 
-  const pageVarsha = `
-    <h2 class="doc-subtitle" style="margin-top:0">Varshaphal ${varsha.year} · वर्षफल</h2>
-    <p class="note">Solar return (Sun returns to its natal degree) on <strong>${fmtDate(varsha.returnDate)}</strong> — age ${varsha.age}.
-    Varsha Lagna: <strong>${varsha.kundli.lagna.sign}</strong> · Muntha (Mu): <strong>${RASHIS[varsha.munthaSignIndex].en}</strong> · Year lord: <strong>${varsha.yearLord}</strong>.</p>
-    <div class="charts">${chartFromVarga(varsha.chart, accent, `Varsha Kundli ${varsha.year}`)}
-      <div class="chart-box"><h3 class="section-title" style="margin-top:0">Predictions · भविष्यफल</h3>
-        <ul class="pred">${varshaNotes.map((n) => `<li>${n}</li>`).join("")}</ul></div>
-    </div>`;
+  // Antardasha: 3 side-by-side columns of Mahadasha blocks per page
+  const antarByMaha: { lord: string; rows: string }[] = [];
+  for (const a of antar) {
+    const cur = a.start.getTime() <= now && now < a.end.getTime();
+    const row = `<tr${cur ? ' class="current"' : ""}><td>${a.lord}</td><td>${fmtDate(a.start)}</td><td>${fmtDate(a.end)}</td></tr>`;
+    const last = antarByMaha[antarByMaha.length - 1];
+    if (last && last.lord === a.mahadasha) last.rows += row;
+    else antarByMaha.push({ lord: a.mahadasha, rows: row });
+  }
+  const antarBlocks = antarByMaha.map(
+    (m) => `<div class="antar-block"><table class="data compact">
+      <tr><th colspan="3">${m.lord} Mahadasha</th></tr>
+      <tr><th>Antar</th><th>From</th><th>To</th></tr>${m.rows}</table></div>`,
+  );
+  const antarPages: string[] = [];
+  for (let i = 0; i < antarBlocks.length; i += 9) {
+    antarPages.push(`
+    <h2 class="doc-subtitle" style="margin-top:0">Antardasha Periods · अंतर्दशा</h2>
+    <div class="antar-grid">${antarBlocks.slice(i, i + 9).join("")}</div>`);
+  }
 
   const page3 = `
     <h2 class="doc-subtitle" style="margin-top:0">Mangal Dosha &amp; Blessings</h2>
@@ -404,6 +401,13 @@ export function buildKundliHtml(
   table.dasha { font-size: 11.5px; }
   .charts { display: flex; justify-content: space-between; gap: 6mm; }
   .chart-box { width: 48%; }
+  .charts.grid3 { flex-wrap: wrap; row-gap: 5mm; }
+  .charts.grid3 .chart-box { width: 31.5%; }
+  .antar-grid { display: flex; flex-wrap: wrap; gap: 3mm; }
+  .antar-block { width: 32%; }
+  .antar-block table.compact { font-size: 8px; }
+  .antar-block table.compact td { padding: 0.8mm 0.6mm; }
+  .antar-block table.compact th { font-size: 8px; padding: 1mm 0.6mm; }
   .chart-box svg { width: 100%; height: auto; }
   .chart-title { text-align: center; font-size: 11px; font-weight: bold; color: ${accent}; margin-top: 1.5mm; }
   .rashi-num { font-size: 13px; fill: ${gold}; text-anchor: middle; font-weight: bold; }
@@ -425,7 +429,7 @@ export function buildKundliHtml(
 </style>
 </head>
 <body>
-  ${[page1, pagePlanets, ...chartPages, pageTransit, pageAshtak, pageDasha, ...antarChunks, pageVarsha, page3].map(page).join("\n")}
+  ${[page1, pageMain, ...chartPages, pageTransitVarsha, pageAshtakDasha, ...antarPages, page3].map(page).join("\n")}
 </body>
 </html>`;
 }

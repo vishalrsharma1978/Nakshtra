@@ -125,5 +125,27 @@ export function summarizeKundliForAi(
     `VARSHAPHAL ${varsha.year}: solar return ${fmt(varsha.returnDate)}, varsha lagna ${varsha.kundli.lagna.sign}, muntha ${RASHIS[varsha.munthaSignIndex].en}, year lord ${varsha.yearLord}. Notes: ${varshaphalPredictions(varsha, k).join(" ")}`,
   );
 
+  // Whitelist of every date the AI may quote. All come from the computed dasha,
+  // antardasha and varshaphal tables above, never from free estimation.
+  const allowed: string[] = [];
+  for (const d of k.dashas)
+    allowed.push(`${d.lord} Mahadasha: ${fmt(d.start)} to ${fmt(d.end)}`);
+  const around = antar.filter(
+    (a) =>
+      a.end.getTime() >= nowMs &&
+      a.start.getTime() <= nowMs + 5 * 365.25 * 86_400_000,
+  );
+  for (const a of around)
+    allowed.push(
+      `${a.mahadasha}/${a.lord} Antardasha: ${fmt(a.start)} to ${fmt(a.end)}`,
+    );
+  allowed.push(
+    `Varshaphal ${varsha.year} solar return: ${fmt(varsha.returnDate)}`,
+  );
+  lines.push(
+    "ALLOWED DATES (the ONLY dates you may mention; quote them exactly as listed, never invent, estimate or shift any date):",
+  );
+  for (const a of allowed) lines.push(`- ${a}`);
+
   return lines.join("\n");
 }
